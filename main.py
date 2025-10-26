@@ -1,63 +1,32 @@
-from typing import Type, TypeAlias
-from collections import defaultdict
+from queue import Queue
 
-import commands
-from interfaces import ICommand, ICommandHandler
-from command_queue import CommandQueueSingleton
-import handlers
-
-State: TypeAlias = dict[
-    Type[ICommand],
-    dict[
-        Type[Exception],
-        Type[ICommandHandler]
-    ]
-]
-
-
-class ExceptionHandler:
-    state: State = defaultdict(dict)
-
-    @classmethod
-    def handler(cls, cmd: ICommand, exc: Exception) -> ICommandHandler:
-        command_queue = CommandQueueSingleton()
-        cmd_type: Type[ICommand] = type(cmd)
-        exc_type: Type[Exception] = type(exc)
-        try:
-            return cls.state[cmd_type][exc_type](cmd, exc, command_queue)
-        except KeyError:
-            return handlers.DefaultCommandHandler(cmd, exc, command_queue)
-
-    @classmethod
-    def register(cls, cmd: Type[ICommand], exc: Type[Exception], handler: Type[ICommandHandler]) -> None:
-        cls.state[cmd][exc] = handler
+from interfaces import ICommand
+from handlers import ExceptionHandler, LogCommandHandler, RepeatOnceHandler
 
 
 class MoveCommand(ICommand):
+    def __init__(self):
+        self.attempt = 0
+
     def execute(self) -> None:
-        print('Выполнение команды MoveCommand')
+        print(f'Выполнение команды MoveCommand {self.attempt}')
+        self.attempt += 1
         raise ValueError('Move error')
 
 
 def main() -> None:
-    commands_queue = CommandQueueSingleton()
-
-    ExceptionHandler.register(MoveCommand, ValueError, handler=handlers.RepeatTwiceHandler)
-    ExceptionHandler.register(commands.RepeatTwiceCommand, ValueError, handler=handlers.RepeatOnceHandler)
-    # ExceptionHandler.register(commands.RepeatOnceCommand, ValueError, handler=handlers.LogCommandHandler)
-    # ExceptionHandler.register(commands.RepeatOnceCommand, ValueError, handler=handlers.LogCommandHandler)
-    commands_queue.put(MoveCommand())
-
+    commands_queue = Queue[ICommand]()
     while True:
         cmd = commands_queue.get()
         try:
             cmd.execute()
         except Exception as exc:
-            handler = ExceptionHandler.handler(cmd, exc)
+            handler = ExceptionHandler.handler(type(cmd), type(exc))
             if handler:
-                handler.handle()
+                handler.handle(cmd, exc, commands_queue)
             else:
-                print(f'Обработчик для {cmd} не найден')
+                # Если обработчик не найден, то записывает ошибку в лог
+                LogCommandHandler().handle(cmd, exc, commands_queue)
 
 
 if __name__ == '__main__':
