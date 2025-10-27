@@ -12,7 +12,7 @@ class ICommand(abc.ABC):
         return self.__class__.__name__
 
 
-class ICommandHandler(abc.ABC):
+class IHandler(abc.ABC):
 
     @abc.abstractmethod
     def handle(self, cmd: ICommand, exc: Exception, queue: Queue[ICommand]) -> None:

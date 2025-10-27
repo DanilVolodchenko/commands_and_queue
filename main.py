@@ -1,32 +1,20 @@
 from queue import Queue
 
 from interfaces import ICommand
-from handlers import ExceptionHandler, LogCommandHandler, RepeatOnceHandler
+from process import process
 
 
 class MoveCommand(ICommand):
-    def __init__(self):
-        self.attempt = 0
-
     def execute(self) -> None:
-        print(f'Выполнение команды MoveCommand {self.attempt}')
-        self.attempt += 1
-        raise ValueError('Move error')
+        print('Выполнение MoveCommand')
+        raise ValueError('Test')
 
 
 def main() -> None:
     commands_queue = Queue[ICommand]()
+
     while True:
-        cmd = commands_queue.get()
-        try:
-            cmd.execute()
-        except Exception as exc:
-            handler = ExceptionHandler.handler(type(cmd), type(exc))
-            if handler:
-                handler.handle(cmd, exc, commands_queue)
-            else:
-                # Если обработчик не найден, то записывает ошибку в лог
-                LogCommandHandler().handle(cmd, exc, commands_queue)
+        process(commands_queue)
 
 
 if __name__ == '__main__':

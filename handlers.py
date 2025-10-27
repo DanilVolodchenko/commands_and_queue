@@ -2,14 +2,14 @@ from typing import Type, TypeAlias
 from collections import defaultdict
 from queue import Queue
 
-import commands
-from interfaces import ICommand, ICommandHandler
+from interfaces import ICommand, IHandler
+from commands import LogCommand, RepeatCommand, RepeatOnceCommand, RepeatTwiceCommand
 
 State: TypeAlias = dict[
     Type[ICommand],
     dict[
         Type[Exception],
-        Type[ICommandHandler]
+        Type[IHandler]
     ]
 ]
 
@@ -18,33 +18,37 @@ class ExceptionHandler:
     state: State = defaultdict(dict)
 
     @classmethod
-    def handler(cls, cmd: Type[ICommand], exc: Type[Exception]) -> ICommandHandler | None:
+    def handler(
+            cls, cmd: Type[ICommand], exc: Type[Exception], *, default_handler: Type[IHandler] = 'LogHandler'
+    ) -> IHandler | None:
+        """Возвращает обработчика в зависимости от типа команды и исключения."""
+
         try:
             return cls.state[cmd][exc]()
         except KeyError:
-            return None
+            return default_handler()
 
     @classmethod
-    def register(cls, cmd: Type[ICommand], exc: Type[Exception], handler: Type[ICommandHandler]) -> None:
+    def register(cls, cmd: Type[ICommand], exc: Type[Exception], handler: Type[IHandler]) -> None:
         cls.state[cmd][exc] = handler
 
 
-class LogCommandHandler(ICommandHandler):
+class LogHandler(IHandler):
 
     def handle(self, cmd: ICommand, exc: Exception, queue: Queue[ICommand]) -> None:
-        queue.put(commands.LogCommand(cmd, exc))
+        queue.put(LogCommand(cmd, exc))
 
 
-class RepeatCommandHandler(ICommandHandler):
+class RepeatHandler(IHandler):
     def handle(self, cmd: ICommand, exc: Exception, queue: Queue[ICommand]) -> None:
-        queue.put(commands.RepeatCommand(cmd))
+        queue.put(RepeatCommand(cmd))
 
 
-class RepeatOnceHandler(ICommandHandler):
+class RepeatOnceHandler(IHandler):
     def handle(self, cmd: ICommand, exc: Exception, queue: Queue[ICommand]) -> None:
-        queue.put(commands.RepeatOnceCommand(cmd))
+        queue.put(RepeatOnceCommand(cmd))
 
 
-class RepeatTwiceHandler(ICommandHandler):
+class RepeatTwiceHandler(IHandler):
     def handle(self, cmd: ICommand, exc: Exception, queue: Queue[ICommand]) -> None:
-        queue.put(commands.RepeatTwiceCommand(cmd))
+        queue.put(RepeatTwiceCommand(cmd))
